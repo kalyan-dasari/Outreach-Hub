@@ -1,0 +1,6 @@
+{
+  "name": "Outreach Hub",
+  "description": "Private outreach and campaign management platform for student announcements and personalized client lead campaigns.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
