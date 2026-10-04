@@ -60,25 +60,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const mainNav = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'inbox', label: 'Replies & Activity', icon: Inbox, badge: counts.replies },
   ];
 
   const audienceNav = [
+    { id: 'students', label: 'Students', icon: GraduationCap, badge: counts.students },
+    { id: 'clients', label: 'Client Leads', icon: Briefcase, badge: counts.clients },
     { id: 'contacts', label: 'All Contacts', icon: Users, badge: counts.contacts },
-    { id: 'students', label: 'Student Outreach', icon: GraduationCap, badge: counts.students },
-    { id: 'clients', label: 'Client Outreach', icon: Briefcase, badge: counts.clients },
   ];
 
   const campaignNav = [
-    { id: 'campaigns', label: 'Campaigns', icon: Send, badge: counts.campaigns },
-    { id: 'sequences', label: 'Sequences', icon: GitFork },
-    { id: 'templates', label: 'Templates', icon: FileText },
-    { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+    { id: 'campaigns', label: 'Bulk Mail & Campaigns', icon: Send, badge: counts.campaigns },
+    { id: 'templates', label: 'Email Templates', icon: FileText },
   ];
 
   const configNav = [
-    { id: 'suppression', label: 'Suppression', icon: ShieldBan, badge: counts.suppression },
-    { id: 'settings', label: 'Settings', icon: Settings },
+    { id: 'settings', label: 'Settings & Providers', icon: Settings },
   ];
 
   const renderNavGroup = (title: string, items: Array<{ id: string; label: string; icon: any; badge?: number }>) => (
