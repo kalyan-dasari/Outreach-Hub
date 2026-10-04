@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppStore } from './hooks/useAppStore';
-import { NavigationTab, Contact, Campaign, Template } from './types';
+import { NavigationTab, Contact, Campaign, Template, ContactType } from './types';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { DashboardView } from './components/DashboardView';
@@ -8,11 +8,7 @@ import { ContactsView } from './components/ContactsView';
 import { StudentOutreachView } from './components/StudentOutreachView';
 import { ClientOutreachView } from './components/ClientOutreachView';
 import { CampaignsView } from './components/CampaignsView';
-import { SequencesView } from './components/SequencesView';
 import { TemplatesView } from './components/TemplatesView';
-import { AnalyticsView } from './components/AnalyticsView';
-import { InboxView } from './components/InboxView';
-import { SuppressionView } from './components/SuppressionView';
 import { SettingsView } from './components/SettingsView';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
@@ -27,7 +23,6 @@ export default function App() {
   const {
     contacts,
     campaigns,
-    sequences,
     templates,
     suppressionList,
     events,
@@ -38,13 +33,8 @@ export default function App() {
     updateContact,
     deleteContact,
     bulkImportContacts,
-    createCampaign,
     sendCampaignNow,
-    toggleSequenceStatus,
-    addSequenceStep,
     addTemplate,
-    addSuppression,
-    removeSuppression,
     updateProviderSettings,
     setCurrentUser,
     resetDemoData,
@@ -76,6 +66,7 @@ export default function App() {
   // Modal Visibility States
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isCsvImportOpen, setIsCsvImportOpen] = useState(false);
+  const [importContactType, setImportContactType] = useState<ContactType>('Student');
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
@@ -108,6 +99,11 @@ export default function App() {
   const handleUseTemplateInCampaign = (tpl: Template) => {
     setActiveTab('campaigns');
     setWizardAutoOpen(true);
+  };
+
+  const handleOpenImport = (type: ContactType = 'Student') => {
+    setImportContactType(type);
+    setIsCsvImportOpen(true);
   };
 
   return (
@@ -168,19 +164,7 @@ export default function App() {
                   }
                 }}
                 onSelectCampaign={setSelectedCampaign}
-              />
-            )}
-
-            {activeTab === 'campaigns' && (
-              <CampaignsView
-                campaigns={campaigns}
-                contacts={contacts}
-                templates={templates}
-                suppressedEmails={suppressedEmails}
-                providerSettings={providerSettings}
-                onSendCampaign={sendCampaignNow}
-                onSelectCampaign={setSelectedCampaign}
-                initialWizardOpen={wizardAutoOpen}
+                onOpenImportModal={(t) => handleOpenImport(t as ContactType || 'Student')}
               />
             )}
 
@@ -189,7 +173,8 @@ export default function App() {
                 contacts={contacts}
                 onSelectContact={setSelectedContact}
                 onLaunchCampaign={() => handleLaunchCampaignWizard()}
-                onOpenImportModal={() => setIsCsvImportOpen(true)}
+                onOpenImportModal={() => handleOpenImport('Student')}
+                onAddContact={addContact}
               />
             )}
 
@@ -199,6 +184,8 @@ export default function App() {
                 onSelectContact={setSelectedContact}
                 onUpdateLeadStatus={(id, status) => updateContact(id, { leadStatus: status })}
                 onLaunchCampaign={handleLaunchCampaignWizard}
+                onOpenImportModal={() => handleOpenImport('Client Lead')}
+                onAddContact={addContact}
               />
             )}
 
@@ -206,7 +193,7 @@ export default function App() {
               <ContactsView
                 contacts={contacts}
                 onSelectContact={setSelectedContact}
-                onOpenImportModal={() => setIsCsvImportOpen(true)}
+                onOpenImportModal={() => handleOpenImport('Student')}
                 onAddContact={addContact}
                 onDeleteContact={deleteContact}
                 onBulkDelete={(ids) => ids.forEach((id) => deleteContact(id))}
@@ -224,12 +211,16 @@ export default function App() {
               />
             )}
 
-            {activeTab === 'sequences' && (
-              <SequencesView
-                sequences={sequences}
+            {activeTab === 'campaigns' && (
+              <CampaignsView
+                campaigns={campaigns}
+                contacts={contacts}
                 templates={templates}
-                onToggleStatus={toggleSequenceStatus}
-                onAddStep={addSequenceStep}
+                suppressedEmails={suppressedEmails}
+                providerSettings={providerSettings}
+                onSendCampaign={sendCampaignNow}
+                onSelectCampaign={setSelectedCampaign}
+                initialWizardOpen={wizardAutoOpen}
               />
             )}
 
@@ -239,31 +230,6 @@ export default function App() {
                 contacts={contacts}
                 onSaveTemplate={addTemplate}
                 onSelectForCampaign={handleUseTemplateInCampaign}
-              />
-            )}
-
-            {activeTab === 'analytics' && (
-              <AnalyticsView
-                campaigns={campaigns}
-                contacts={contacts}
-                events={events}
-              />
-            )}
-
-            {activeTab === 'inbox' && (
-              <InboxView
-                events={events}
-                contacts={contacts}
-                onSelectContact={setSelectedContact}
-                onUpdateStatus={(id, status) => updateContact(id, { status })}
-              />
-            )}
-
-            {activeTab === 'suppression' && (
-              <SuppressionView
-                suppressionList={suppressionList}
-                onAddSuppression={addSuppression}
-                onRemoveSuppression={removeSuppression}
               />
             )}
 
@@ -294,7 +260,7 @@ export default function App() {
             if (tab === 'create-campaign') {
               handleLaunchCampaignWizard();
             } else {
-              setActiveTab(tab);
+              setActiveTab(tab as any);
             }
             setIsSearchOpen(false);
           }}
@@ -303,9 +269,16 @@ export default function App() {
         <CsvImportModal
           isOpen={isCsvImportOpen}
           onClose={() => setIsCsvImportOpen(false)}
+          defaultContactType={importContactType}
           onImportComplete={(importedContacts) => {
             bulkImportContacts(importedContacts);
-            setActiveTab('contacts');
+            if (importContactType === 'Student') {
+              setActiveTab('students');
+            } else if (importContactType === 'Client Lead') {
+              setActiveTab('clients');
+            } else {
+              setActiveTab('contacts');
+            }
           }}
           existingEmails={new Set(contacts.map((c) => c.email.toLowerCase()))}
           suppressedEmails={suppressedEmails}
