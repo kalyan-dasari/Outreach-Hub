@@ -12,6 +12,8 @@ import {
   GraduationCap,
   Briefcase,
   ExternalLink,
+  Send,
+  X,
 } from 'lucide-react';
 import { Template, Contact } from '../types';
 import { personalizeText } from '../lib/personalization';
@@ -51,13 +53,13 @@ export const TemplatesView: React.FC<TemplatesViewProps> = ({
         !q ||
         t.name.toLowerCase().includes(q) ||
         t.subject.toLowerCase().includes(q) ||
-        t.body.toLowerCase().includes(q);
+        (t.body && t.body.toLowerCase().includes(q));
       return matchesCat && matchesQ;
     });
   }, [templates, selectedCategory, searchQuery]);
 
   const handleCopyBody = (t: Template) => {
-    navigator.clipboard.writeText(t.body);
+    navigator.clipboard.writeText(t.body || t.content || '');
     setCopiedId(t.id);
     setTimeout(() => setCopiedId(null), 2000);
   };
@@ -72,7 +74,8 @@ export const TemplatesView: React.FC<TemplatesViewProps> = ({
       subject: newSubject.trim(),
       preheader: newPreheader.trim() || undefined,
       body: newBody.trim(),
-      variables: ['first_name', 'organization'],
+      content: newBody.trim(),
+      variables: ['firstName', 'organization', 'college', 'department'],
     });
 
     setNewName('');
@@ -82,6 +85,10 @@ export const TemplatesView: React.FC<TemplatesViewProps> = ({
     setShowCreateModal(false);
   };
 
+  const insertVariableToken = (tok: string) => {
+    setNewBody((prev) => prev + ` {{${tok}}}`);
+  };
+
   return (
     <div className="space-y-6 pb-12">
       {/* Top Banner */}
@@ -89,23 +96,23 @@ export const TemplatesView: React.FC<TemplatesViewProps> = ({
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700">
-              Copywriting & Frameworks
+              Email Templates
             </span>
             <span className="text-zinc-400 text-xs">
-              {templates.length} Production Outreach Templates
+              {templates.length} Ready Outreach Templates
             </span>
           </div>
           <h1 className="text-xl font-bold tracking-tight">
             Email Template Library
           </h1>
           <p className="text-xs text-zinc-300 mt-0.5 max-w-xl">
-            Pre-tested copy for campus announcements and high-converting B2B client prospecting with dynamic fallback variables.
+            Pre-tested templates with personalized merge tags for students (internships, campus drives) and clients (cold outreach, pitches).
           </p>
         </div>
 
         <button
           onClick={() => setShowCreateModal(true)}
-          className="px-4 py-2 rounded-xl bg-white text-zinc-900 hover:bg-zinc-100 text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 self-start"
+          className="px-4 py-2 rounded-xl bg-white text-zinc-900 hover:bg-zinc-100 text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 self-start cursor-pointer"
         >
           <Plus className="w-3.5 h-3.5" />
           <span>New Template</span>
@@ -124,7 +131,7 @@ export const TemplatesView: React.FC<TemplatesViewProps> = ({
             <button
               key={cat.id}
               onClick={() => setSelectedCategory(cat.id)}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg font-medium transition-all ${
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg font-medium transition-all cursor-pointer ${
                 selectedCategory === cat.id
                   ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 shadow-xs'
                   : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
@@ -158,17 +165,19 @@ export const TemplatesView: React.FC<TemplatesViewProps> = ({
             <div>
               <div className="flex items-center justify-between mb-2">
                 <span
-                  className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                  className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 ${
                     tpl.category === 'student'
                       ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300'
                       : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
                   }`}
                 >
-                  {tpl.category === 'student' ? 'Student' : 'Client Prospecting'}
+                  {tpl.category === 'student' ? <GraduationCap className="w-3 h-3" /> : <Briefcase className="w-3 h-3" />}
+                  <span>{tpl.category === 'student' ? 'Student Outreach' : 'Client Outreach'}</span>
                 </span>
+
                 <button
                   onClick={() => handleCopyBody(tpl)}
-                  className="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 rounded"
+                  className="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 rounded cursor-pointer"
                   title="Copy email body"
                 >
                   {copiedId === tpl.id ? (
@@ -187,18 +196,16 @@ export const TemplatesView: React.FC<TemplatesViewProps> = ({
                 Subject: {tpl.subject}
               </p>
 
-              <div className="mt-2.5 p-3 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-100 dark:border-zinc-800 text-[11px] text-zinc-600 dark:text-zinc-400 line-clamp-4 font-mono leading-relaxed">
-                {tpl.body}
+              <div className="mt-2.5 p-3 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-100 dark:border-zinc-800 text-[11px] text-zinc-600 dark:text-zinc-400 line-clamp-4 font-sans leading-relaxed">
+                {tpl.body || tpl.content}
               </div>
             </div>
 
             {/* Card Actions */}
             <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between gap-2">
               <button
-                onClick={() => {
-                  setPreviewTemplate(tpl);
-                }}
-                className="flex items-center gap-1 text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+                onClick={() => setPreviewTemplate(tpl)}
+                className="flex items-center gap-1 text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white cursor-pointer"
               >
                 <Eye className="w-3.5 h-3.5" />
                 <span>Live Preview</span>
@@ -206,9 +213,10 @@ export const TemplatesView: React.FC<TemplatesViewProps> = ({
 
               <button
                 onClick={() => onSelectForCampaign(tpl)}
-                className="px-3 py-1.5 rounded-lg bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 text-xs font-semibold hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 text-xs font-semibold hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors cursor-pointer"
               >
-                Use in Campaign
+                <Send className="w-3 h-3" />
+                <span>Use in Bulk Mail</span>
               </button>
             </div>
           </div>
@@ -229,20 +237,20 @@ export const TemplatesView: React.FC<TemplatesViewProps> = ({
                   Template Preview: {previewTemplate.name}
                 </h3>
                 <p className="text-[11px] text-zinc-500">
-                  Resolved using sample contact data
+                  Preview with merged recipient data
                 </p>
               </div>
               <button
                 onClick={() => setPreviewTemplate(null)}
-                className="p-1 text-zinc-400 hover:text-zinc-600"
+                className="p-1 text-zinc-400 hover:text-zinc-600 cursor-pointer"
               >
-                ✕
+                <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Select Contact for resolution */}
             <div className="flex items-center gap-2">
-              <span className="text-zinc-500 font-medium">Test Against:</span>
+              <span className="text-zinc-500 font-medium">Test Recipient:</span>
               <select
                 value={previewContact?.id || ''}
                 onChange={(e) => {
@@ -253,7 +261,7 @@ export const TemplatesView: React.FC<TemplatesViewProps> = ({
               >
                 {contacts.slice(0, 10).map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.firstName} {c.lastName} ({c.contactType})
+                    {c.firstName} {c.lastName} ({c.contactType} - {c.college || c.organization || c.email})
                   </option>
                 ))}
               </select>
@@ -278,19 +286,25 @@ export const TemplatesView: React.FC<TemplatesViewProps> = ({
                 </span>
                 <div className="mt-1 p-3 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 whitespace-pre-wrap text-zinc-800 dark:text-zinc-200 leading-relaxed font-sans max-h-60 overflow-y-auto custom-scrollbar">
                   {previewContact
-                    ? personalizeText(previewTemplate.body, previewContact)
-                    : previewTemplate.body}
+                    ? personalizeText(previewTemplate.body || previewTemplate.content || '', previewContact)
+                    : previewTemplate.body || previewTemplate.content}
                 </div>
               </div>
             </div>
 
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setPreviewTemplate(null)}
+                className="px-4 py-2 rounded-xl text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              >
+                Close
+              </button>
               <button
                 onClick={() => {
                   onSelectForCampaign(previewTemplate);
                   setPreviewTemplate(null);
                 }}
-                className="px-4 py-2 rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 font-bold"
+                className="px-4 py-2 rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 font-bold cursor-pointer"
               >
                 Use this Template in Campaign
               </button>
@@ -308,14 +322,15 @@ export const TemplatesView: React.FC<TemplatesViewProps> = ({
           />
           <div className="relative w-full max-w-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl overflow-hidden z-10 p-6 space-y-4 text-xs">
             <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
-              <h3 className="text-sm font-bold text-zinc-900 dark:text-white">
-                Create Email Template
+              <h3 className="text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+                <FileText className="w-5 h-5 text-indigo-500" />
+                <span>Create Email Template</span>
               </h3>
               <button
                 onClick={() => setShowCreateModal(false)}
-                className="p-1 text-zinc-400 hover:text-zinc-600"
+                className="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer"
               >
-                ✕
+                <X className="w-5 h-5" />
               </button>
             </div>
 
@@ -336,7 +351,7 @@ export const TemplatesView: React.FC<TemplatesViewProps> = ({
 
               <div className="space-y-1">
                 <label className="font-semibold text-zinc-800 dark:text-zinc-200">
-                  Category
+                  Target Category
                 </label>
                 <select
                   value={newCategory}
@@ -344,7 +359,7 @@ export const TemplatesView: React.FC<TemplatesViewProps> = ({
                   className="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white outline-none"
                 >
                   <option value="student">Student Outreach</option>
-                  <option value="client">Client Prospecting</option>
+                  <option value="client">Client Outreach</option>
                   <option value="general">General Outreach</option>
                 </select>
               </div>
@@ -356,38 +371,55 @@ export const TemplatesView: React.FC<TemplatesViewProps> = ({
                 <input
                   type="text"
                   required
-                  placeholder="e.g. {{first_name}}, invitation to represent {{college}}"
+                  placeholder="e.g. Campus Opportunity: {{college}} Tech Fellowship"
                   value={newSubject}
                   onChange={(e) => setNewSubject(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white outline-none"
                 />
               </div>
 
+              {/* Variable Chips */}
+              <div className="p-2 rounded-lg bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700">
+                <span className="text-[10px] font-semibold text-zinc-500 block mb-1">Click to insert variable into body:</span>
+                <div className="flex flex-wrap gap-1">
+                  {['firstName', 'lastName', 'college', 'department', 'batch', 'rollNumber', 'organization', 'role'].map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => insertVariableToken(v)}
+                      className="px-1.5 py-0.5 text-[10px] font-mono bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-600 rounded text-zinc-700 dark:text-zinc-300 hover:border-zinc-400"
+                    >
+                      +&#123;&#123;{v}&#125;&#125;
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="space-y-1">
                 <label className="font-semibold text-zinc-800 dark:text-zinc-200">
-                  Email Body *
+                  Email Body Copy *
                 </label>
                 <textarea
                   rows={6}
                   required
-                  placeholder="Write your email body with tokens like {{first_name}}, {{organization}}, {{college}}..."
+                  placeholder="Hello {{firstName}},\n\nWe would like to share an exciting opportunity with students at {{college}}..."
                   value={newBody}
                   onChange={(e) => setNewBody(e.target.value)}
-                  className="w-full p-3 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white outline-none font-mono text-xs"
+                  className="w-full p-3 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white outline-none font-sans text-xs leading-relaxed"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 rounded-xl text-zinc-600 dark:text-zinc-400 font-medium"
+                  className="px-4 py-2 rounded-xl text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 font-bold"
+                  className="px-4 py-2 rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 font-bold hover:bg-zinc-800 dark:hover:bg-zinc-100 cursor-pointer"
                 >
                   Save Template
                 </button>
