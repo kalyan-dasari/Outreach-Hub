@@ -13,6 +13,9 @@ import {
   Sparkles,
   ChevronRight,
   Filter,
+  UploadCloud,
+  UserPlus,
+  X,
 } from 'lucide-react';
 import { Contact, LeadStatus } from '../types';
 
@@ -21,6 +24,8 @@ interface ClientOutreachViewProps {
   onSelectContact: (contact: Contact) => void;
   onUpdateLeadStatus: (contactId: string, status: LeadStatus) => void;
   onLaunchCampaign: () => void;
+  onOpenImportModal?: () => void;
+  onAddContact?: (contact: Omit<Contact, 'id' | 'createdAt'>) => void;
 }
 
 const KANBAN_STAGES: Array<{ id: LeadStatus; label: string; color: string }> = [
@@ -41,10 +46,25 @@ export const ClientOutreachView: React.FC<ClientOutreachViewProps> = ({
   onSelectContact,
   onUpdateLeadStatus,
   onLaunchCampaign,
+  onOpenImportModal,
+  onAddContact,
 }) => {
   const [viewMode, setViewMode] = useState<'kanban' | 'table'>('kanban');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIndustry, setSelectedIndustry] = useState<string>('all');
+
+  // Add Lead Modal state
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newFirstName, setNewFirstName] = useState('');
+  const [newLastName, setNewLastName] = useState('');
+  const [newEmail, setNewEmail] = useState('');
+  const [newCompany, setNewCompany] = useState('');
+  const [newRole, setNewRole] = useState('');
+  const [newIndustry, setNewIndustry] = useState('');
+  const [newCity, setNewCity] = useState('');
+  const [newDealValue, setNewDealValue] = useState('2500');
+  const [newObservation, setNewObservation] = useState('');
+  const [newOffer, setNewOffer] = useState('');
 
   // Filter client leads only
   const clientLeads = useMemo(() => {
@@ -80,6 +100,43 @@ export const ClientOutreachView: React.FC<ClientOutreachViewProps> = ({
     });
   }, [clientLeads, searchQuery, selectedIndustry]);
 
+  const handleAddLeadSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newFirstName.trim() || !newEmail.trim()) return;
+
+    if (onAddContact) {
+      onAddContact({
+        firstName: newFirstName.trim(),
+        lastName: newLastName.trim(),
+        email: newEmail.trim().toLowerCase(),
+        organization: newCompany.trim() || 'Client Enterprise',
+        role: newRole.trim() || 'Founder / Partner',
+        industry: newIndustry.trim() || 'Technology & Services',
+        city: newCity.trim() || undefined,
+        dealValue: Number(newDealValue) || 2000,
+        personalObservation: newObservation.trim() || undefined,
+        assignedOffer: newOffer.trim() || undefined,
+        contactType: 'Client Lead',
+        leadStatus: 'New',
+        tags: ['Client Lead', newIndustry.trim() || 'B2B'],
+        status: 'Active',
+        source: 'Manual Client Lead',
+        notes: [],
+      });
+    }
+
+    setNewFirstName('');
+    setNewLastName('');
+    setNewEmail('');
+    setNewCompany('');
+    setNewRole('');
+    setNewIndustry('');
+    setNewCity('');
+    setNewObservation('');
+    setNewOffer('');
+    setShowAddModal(false);
+  };
+
   return (
     <div className="space-y-6 pb-12">
       {/* Top Banner */}
@@ -94,46 +151,64 @@ export const ClientOutreachView: React.FC<ClientOutreachViewProps> = ({
             </span>
           </div>
           <h1 className="text-xl font-bold tracking-tight">
-            Client Outreach & Deal Flow
+            Client Outreach & Deal Pipeline
           </h1>
           <p className="text-xs text-zinc-300 mt-0.5 max-w-xl">
-            Track bespoke personalized observations, target offers, website audits, and follow-up stages for high-value business development.
+            Track bespoke personalized observations, target offers, website audits, and follow-up stages for high-value client outreach.
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5 shrink-0">
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
           {/* View Toggle */}
           <div className="flex bg-zinc-800 p-1 rounded-xl border border-zinc-700 text-xs">
             <button
               onClick={() => setViewMode('kanban')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-colors ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer ${
                 viewMode === 'kanban'
                   ? 'bg-zinc-700 text-white'
                   : 'text-zinc-400 hover:text-white'
               }`}
             >
               <Kanban className="w-3.5 h-3.5" />
-              <span>Pipeline Kanban</span>
+              <span>Pipeline</span>
             </button>
             <button
               onClick={() => setViewMode('table')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-colors ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer ${
                 viewMode === 'table'
                   ? 'bg-zinc-700 text-white'
                   : 'text-zinc-400 hover:text-white'
               }`}
             >
               <TableIcon className="w-3.5 h-3.5" />
-              <span>Table View</span>
+              <span>Table</span>
             </button>
           </div>
 
           <button
+            onClick={() => setShowAddModal(true)}
+            className="px-3.5 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-zinc-100 border border-zinc-700 transition-colors flex items-center gap-1.5 cursor-pointer"
+          >
+            <UserPlus className="w-4 h-4 text-emerald-400" />
+            <span>Add Lead</span>
+          </button>
+
+          {onOpenImportModal && (
+            <button
+              onClick={onOpenImportModal}
+              className="px-3.5 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-zinc-100 border border-zinc-700 transition-colors flex items-center gap-1.5 cursor-pointer"
+            >
+              <UploadCloud className="w-4 h-4 text-zinc-400" />
+              <span>Import Clients</span>
+            </button>
+          )}
+
+          <button
             onClick={onLaunchCampaign}
-            className="px-4 py-2 rounded-xl bg-white text-zinc-900 hover:bg-zinc-100 text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
+            className="px-4 py-2 rounded-xl bg-white text-zinc-900 hover:bg-zinc-100 text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
           >
             <Send className="w-3.5 h-3.5" />
-            <span>Launch Client Campaign</span>
+            <span>Bulk Mail Clients ({filteredLeads.length})</span>
           </button>
         </div>
       </div>
@@ -207,7 +282,6 @@ export const ClientOutreachView: React.FC<ClientOutreachViewProps> = ({
                         onClick={() => onSelectContact(lead)}
                         className="p-3.5 rounded-xl bg-white dark:bg-zinc-800/80 border border-zinc-200/80 dark:border-zinc-700/60 shadow-xs hover:border-zinc-400 dark:hover:border-zinc-500 cursor-pointer transition-all space-y-2.5"
                       >
-                        {/* Company & Role */}
                         <div>
                           <p className="font-bold text-xs text-zinc-900 dark:text-white">
                             {lead.organization || 'Direct Lead'}
@@ -217,14 +291,12 @@ export const ClientOutreachView: React.FC<ClientOutreachViewProps> = ({
                           </p>
                         </div>
 
-                        {/* Icebreaker / Personal Observation Snippet */}
                         {lead.personalObservation && (
                           <div className="p-2 rounded-lg bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-100 dark:border-zinc-800 text-[11px] text-zinc-700 dark:text-zinc-300 italic">
                             "{lead.personalObservation}"
                           </div>
                         )}
 
-                        {/* Assigned Offer */}
                         {lead.assignedOffer && (
                           <div className="flex items-center gap-1 text-[11px] text-indigo-600 dark:text-indigo-400 font-medium">
                             <Sparkles className="w-3 h-3 shrink-0" />
@@ -232,13 +304,11 @@ export const ClientOutreachView: React.FC<ClientOutreachViewProps> = ({
                           </div>
                         )}
 
-                        {/* Card Footer: Deal Value, City, Next Stage */}
                         <div className="pt-1.5 border-t border-zinc-100 dark:border-zinc-700/60 flex items-center justify-between text-[11px]">
                           <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
                             ${lead.dealValue ? lead.dealValue.toLocaleString() : '1,500'}
                           </span>
 
-                          {/* Quick Advance Button */}
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -248,10 +318,9 @@ export const ClientOutreachView: React.FC<ClientOutreachViewProps> = ({
                               }
                             }}
                             title="Advance to next stage"
-                            className="flex items-center gap-0.5 px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-200 hover:bg-zinc-200"
+                            className="p-1 rounded-md text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
                           >
-                            <span>Advance</span>
-                            <ChevronRight className="w-3 h-3" />
+                            <ChevronRight className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </div>
@@ -270,20 +339,19 @@ export const ClientOutreachView: React.FC<ClientOutreachViewProps> = ({
         </div>
       )}
 
-      {/* VIEW 2: TABLE VIEW */}
+      {/* VIEW 2: STRUCTURED TABLE */}
       {viewMode === 'table' && (
-        <div className="rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-xs overflow-hidden">
-          <div className="overflow-x-auto custom-scrollbar">
+        <div className="p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-xs">
+          <div className="overflow-x-auto custom-scrollbar rounded-xl border border-zinc-100 dark:border-zinc-800">
             <table className="w-full text-left text-xs">
               <thead className="bg-zinc-50 dark:bg-zinc-800/60 text-zinc-500 font-semibold border-b border-zinc-200 dark:border-zinc-800">
                 <tr>
-                  <th className="px-4 py-3">Company & Contact</th>
-                  <th className="px-4 py-3">Website</th>
-                  <th className="px-4 py-3">Observation / Angle</th>
-                  <th className="px-4 py-3">Assigned Offer</th>
+                  <th className="px-4 py-3">Lead Contact</th>
+                  <th className="px-4 py-3">Company & Role</th>
+                  <th className="px-4 py-3">Industry</th>
                   <th className="px-4 py-3">Deal Value</th>
-                  <th className="px-4 py-3">Pipeline Stage</th>
-                  <th className="px-4 py-3">Next Action</th>
+                  <th className="px-4 py-3">Stage</th>
+                  <th className="px-4 py-3">Personalized Observation</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60 text-zinc-700 dark:text-zinc-300">
@@ -293,61 +361,183 @@ export const ClientOutreachView: React.FC<ClientOutreachViewProps> = ({
                     onClick={() => onSelectContact(lead)}
                     className="hover:bg-zinc-50 dark:hover:bg-zinc-800/40 cursor-pointer transition-colors"
                   >
-                    <td className="px-4 py-3.5">
-                      <p className="font-bold text-zinc-900 dark:text-white">
-                        {lead.organization || 'Direct Lead'}
+                    <td className="px-4 py-3">
+                      <p className="font-semibold text-zinc-900 dark:text-white">
+                        {lead.firstName} {lead.lastName}
                       </p>
-                      <p className="text-[11px] text-zinc-400">
-                        {lead.firstName} {lead.lastName} • {lead.role}
+                      <p className="text-[11px] text-zinc-400 font-mono">{lead.email}</p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="font-medium text-zinc-900 dark:text-white">
+                        {lead.organization || '—'}
                       </p>
+                      <p className="text-[11px] text-zinc-500">{lead.role || '—'}</p>
                     </td>
-                    <td className="px-4 py-3.5">
-                      {lead.website ? (
-                        <a
-                          href={lead.website.startsWith('http') ? lead.website : `https://${lead.website}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          className="text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 truncate max-w-[140px]"
-                        >
-                          <span>{lead.website}</span>
-                          <ExternalLink className="w-3 h-3 shrink-0" />
-                        </a>
-                      ) : (
-                        '—'
-                      )}
+                    <td className="px-4 py-3 font-medium text-zinc-800 dark:text-zinc-200">
+                      {lead.industry || 'General'}
                     </td>
-                    <td className="px-4 py-3.5 max-w-xs text-zinc-600 dark:text-zinc-400 truncate">
+                    <td className="px-4 py-3 font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                      ${(lead.dealValue || 1500).toLocaleString()}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200">
+                        {lead.leadStatus || 'New'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-zinc-500 italic max-w-xs truncate">
                       {lead.personalObservation || '—'}
-                    </td>
-                    <td className="px-4 py-3.5 text-zinc-700 dark:text-zinc-300 font-medium">
-                      {lead.assignedOffer || 'Custom Proposal'}
-                    </td>
-                    <td className="px-4 py-3.5 font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                      ${lead.dealValue ? lead.dealValue.toLocaleString() : '1,500'}
-                    </td>
-                    <td className="px-4 py-3.5" onClick={(e) => e.stopPropagation()}>
-                      <select
-                        value={lead.leadStatus || 'New'}
-                        onChange={(e) => onUpdateLeadStatus(lead.id, e.target.value as any)}
-                        className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-1 text-xs font-semibold outline-none"
-                      >
-                        {KANBAN_STAGES.map((s) => (
-                          <option key={s.id} value={s.id}>
-                            {s.label}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="px-4 py-3.5 text-zinc-400 font-mono text-[11px]">
-                      {lead.nextFollowUpDate
-                        ? new Date(lead.nextFollowUpDate).toLocaleDateString()
-                        : 'Pending'}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Add Single Client Lead Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs" onClick={() => setShowAddModal(false)} />
+          <div className="relative w-full max-w-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl p-6 z-10 space-y-4">
+            <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
+              <h3 className="text-base font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+                <Briefcase className="w-5 h-5 text-emerald-500" />
+                <span>Add Client Prospect / Lead</span>
+              </h3>
+              <button
+                onClick={() => setShowAddModal(false)}
+                className="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddLeadSubmit} className="space-y-3.5 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                    First Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newFirstName}
+                    onChange={(e) => setNewFirstName(e.target.value)}
+                    placeholder="David"
+                    className="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                    Last Name
+                  </label>
+                  <input
+                    type="text"
+                    value={newLastName}
+                    onChange={(e) => setNewLastName(e.target.value)}
+                    placeholder="Miller"
+                    className="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                    Email Address *
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={newEmail}
+                    onChange={(e) => setNewEmail(e.target.value)}
+                    placeholder="david@company.com"
+                    className="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                    Company Name
+                  </label>
+                  <input
+                    type="text"
+                    value={newCompany}
+                    onChange={(e) => setNewCompany(e.target.value)}
+                    placeholder="Precision Dental"
+                    className="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2.5">
+                <div>
+                  <label className="block font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                    Job Title / Role
+                  </label>
+                  <input
+                    type="text"
+                    value={newRole}
+                    onChange={(e) => setNewRole(e.target.value)}
+                    placeholder="Partner"
+                    className="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                    Industry
+                  </label>
+                  <input
+                    type="text"
+                    value={newIndustry}
+                    onChange={(e) => setNewIndustry(e.target.value)}
+                    placeholder="Healthcare"
+                    className="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                    Est. Deal Value ($)
+                  </label>
+                  <input
+                    type="number"
+                    value={newDealValue}
+                    onChange={(e) => setNewDealValue(e.target.value)}
+                    placeholder="2500"
+                    className="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                  Personalized Observation (Merge Tag: <code className="text-indigo-500">{'{{personalObservation}}'}</code>)
+                </label>
+                <input
+                  type="text"
+                  value={newObservation}
+                  onChange={(e) => setNewObservation(e.target.value)}
+                  placeholder="e.g. mobile site takes 5.2s to load and lacks instant booking"
+                  className="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white outline-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-zinc-100 dark:border-zinc-800">
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(false)}
+                  className="px-4 py-2 rounded-xl text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 font-semibold hover:bg-zinc-800 dark:hover:bg-zinc-100 cursor-pointer"
+                >
+                  Save Lead
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
