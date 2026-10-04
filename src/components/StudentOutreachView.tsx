@@ -15,6 +15,8 @@ import {
   UploadCloud,
   ChevronRight,
   Code2,
+  X,
+  UserPlus,
 } from 'lucide-react';
 import { Contact, Template } from '../types';
 
@@ -23,6 +25,7 @@ interface StudentOutreachViewProps {
   onSelectContact: (contact: Contact) => void;
   onLaunchCampaign: (filter: { college?: string; department?: string; batch?: string }) => void;
   onOpenImportModal: () => void;
+  onAddContact?: (contact: Omit<Contact, 'id' | 'createdAt'>) => void;
 }
 
 export const StudentOutreachView: React.FC<StudentOutreachViewProps> = ({
@@ -30,11 +33,24 @@ export const StudentOutreachView: React.FC<StudentOutreachViewProps> = ({
   onSelectContact,
   onLaunchCampaign,
   onOpenImportModal,
+  onAddContact,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCollege, setSelectedCollege] = useState<string>('all');
   const [selectedDept, setSelectedDept] = useState<string>('all');
   const [selectedBatch, setSelectedBatch] = useState<string>('all');
+
+  // Add single student modal state
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newFirstName, setNewFirstName] = useState('');
+  const [newLastName, setNewLastName] = useState('');
+  const [newEmail, setNewEmail] = useState('');
+  const [newCollege, setNewCollege] = useState('');
+  const [newDept, setNewDept] = useState('');
+  const [newBatch, setNewBatch] = useState('');
+  const [newRollNumber, setNewRollNumber] = useState('');
+  const [newCourse, setNewCourse] = useState('');
+  const [newTags, setNewTags] = useState('Campus Lead');
 
   // Institutional Pattern Generator State
   const [showPatternTool, setShowPatternTool] = useState(false);
@@ -82,7 +98,8 @@ export const StudentOutreachView: React.FC<StudentOutreachViewProps> = ({
         `${s.firstName} ${s.lastName}`.toLowerCase().includes(q) ||
         s.email.toLowerCase().includes(q) ||
         (s.rollNumber && s.rollNumber.toLowerCase().includes(q)) ||
-        (s.college && s.college.toLowerCase().includes(q));
+        (s.college && s.college.toLowerCase().includes(q)) ||
+        (s.course && s.course.toLowerCase().includes(q));
 
       const matchesCollege = selectedCollege === 'all' || s.college === selectedCollege;
       const matchesDept = selectedDept === 'all' || s.department === selectedDept;
@@ -117,6 +134,39 @@ export const StudentOutreachView: React.FC<StudentOutreachViewProps> = ({
     setGeneratedPreview(results);
   };
 
+  const handleAddStudentSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newFirstName.trim() || !newEmail.trim()) return;
+
+    if (onAddContact) {
+      onAddContact({
+        firstName: newFirstName.trim(),
+        lastName: newLastName.trim(),
+        email: newEmail.trim().toLowerCase(),
+        college: newCollege.trim() || 'General University',
+        department: newDept.trim() || 'Computer Science',
+        batch: newBatch.trim() || '2024-2028',
+        rollNumber: newRollNumber.trim() || undefined,
+        course: newCourse.trim() || 'B.Tech',
+        contactType: 'Student',
+        tags: newTags ? newTags.split(',').map((t) => t.trim()).filter(Boolean) : ['Student'],
+        status: 'Active',
+        source: 'Manual Entry',
+        notes: [],
+      });
+    }
+
+    setNewFirstName('');
+    setNewLastName('');
+    setNewEmail('');
+    setNewCollege('');
+    setNewDept('');
+    setNewBatch('');
+    setNewRollNumber('');
+    setNewCourse('');
+    setShowAddModal(false);
+  };
+
   return (
     <div className="space-y-6 pb-12">
       {/* Top Banner */}
@@ -124,35 +174,35 @@ export const StudentOutreachView: React.FC<StudentOutreachViewProps> = ({
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800/60">
-              Campus Intelligence
+              Campus Outreach
             </span>
             <span className="text-zinc-400 text-xs">
               {students.length} Verified Students Across {colleges.length} Campuses
             </span>
           </div>
           <h1 className="text-xl font-bold tracking-tight">
-            Student Outreach Engine
+            Student Outreach & Roster Hub
           </h1>
           <p className="text-xs text-zinc-300 mt-0.5 max-w-xl">
-            Broadcast legitimate hackathons, open-source workshops, campus ambassador invitations, and career resources to targeted student rosters.
+            Import student contacts from CSV or Excel, organize by campus and batch, and broadcast bulk emails with personalized merge tags.
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5 shrink-0">
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
           <button
-            onClick={() => setShowPatternTool(!showPatternTool)}
-            className="px-3.5 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-zinc-100 border border-zinc-700 transition-colors flex items-center gap-1.5"
+            onClick={() => setShowAddModal(true)}
+            className="px-3.5 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-zinc-100 border border-zinc-700 transition-colors flex items-center gap-1.5 cursor-pointer"
           >
-            <Code2 className="w-4 h-4 text-amber-400" />
-            <span>{showPatternTool ? 'Hide Generator' : 'Institutional Pattern Tool'}</span>
+            <UserPlus className="w-4 h-4 text-emerald-400" />
+            <span>Add Student</span>
           </button>
 
           <button
             onClick={onOpenImportModal}
-            className="px-3.5 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-zinc-100 border border-zinc-700 transition-colors flex items-center gap-1.5"
+            className="px-3.5 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-zinc-100 border border-zinc-700 transition-colors flex items-center gap-1.5 cursor-pointer"
           >
-            <UploadCloud className="w-4 h-4 text-zinc-400" />
-            <span>Import Roster CSV</span>
+            <UploadCloud className="w-4 h-4 text-indigo-400" />
+            <span>Import Students CSV</span>
           </button>
 
           <button
@@ -163,125 +213,13 @@ export const StudentOutreachView: React.FC<StudentOutreachViewProps> = ({
                 batch: selectedBatch !== 'all' ? selectedBatch : undefined,
               })
             }
-            className="px-4 py-2 rounded-xl bg-white text-zinc-900 hover:bg-zinc-100 text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
+            className="px-4 py-2 rounded-xl bg-white text-zinc-900 hover:bg-zinc-100 text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
           >
             <Send className="w-3.5 h-3.5" />
-            <span>Broadcast to Students ({filteredStudents.length})</span>
+            <span>Bulk Mail Students ({filteredStudents.length})</span>
           </button>
         </div>
       </div>
-
-      {/* Institutional Pattern Generator (Drawer / Expandable Panel) */}
-      {showPatternTool && (
-        <div className="p-5 rounded-2xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700/80 shadow-xs space-y-4 animate-in fade-in duration-200">
-          <div className="flex items-start justify-between">
-            <div>
-              <h3 className="text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                <span>Safe Institutional Email Pattern Generator</span>
-              </h3>
-              <p className="text-xs text-zinc-500 mt-0.5">
-                Generate and preview legitimate .edu student email handles from known rosters. Never sends blind emails without manual review.
-              </p>
-            </div>
-            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 rounded">
-              Preview-Only Sandbox
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-            {/* Pattern Input & Presets */}
-            <div className="space-y-3">
-              <label className="font-semibold text-zinc-800 dark:text-zinc-200 block">
-                Pattern Syntax Formula
-              </label>
-              <input
-                type="text"
-                value={patternFormat}
-                onChange={(e) => setPatternFormat(e.target.value)}
-                className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white outline-none"
-              />
-
-              <div className="flex flex-wrap gap-1.5">
-                <span className="text-[11px] text-zinc-400 mr-1 self-center">Presets:</span>
-                {[
-                  '{first_name}.{last_name}@stanfordtech.edu',
-                  '{roll_number}@mitengineering.edu',
-                  '{first_initial}{last_name}@berkeleytech.edu',
-                ].map((preset) => (
-                  <button
-                    key={preset}
-                    onClick={() => setPatternFormat(preset)}
-                    className="px-2 py-0.5 text-[10px] font-mono rounded-md bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:border-zinc-400"
-                  >
-                    {preset}
-                  </button>
-                ))}
-              </div>
-
-              <div>
-                <label className="font-semibold text-zinc-800 dark:text-zinc-200 block mb-1">
-                  Roster CSV Snippet (FirstName, LastName, RollNo, Dept)
-                </label>
-                <textarea
-                  rows={4}
-                  value={patternRosterInput}
-                  onChange={(e) => setPatternRosterInput(e.target.value)}
-                  className="w-full p-2.5 text-xs font-mono rounded-xl border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white outline-none"
-                />
-              </div>
-
-              <button
-                onClick={handleGeneratePatternPreview}
-                className="px-3.5 py-2 rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 font-semibold hover:bg-zinc-800 text-xs"
-              >
-                Simulate & Test Pattern Match
-              </button>
-            </div>
-
-            {/* Resolved Preview */}
-            <div className="p-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-2">
-              <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-2">
-                <span className="font-semibold text-zinc-800 dark:text-zinc-200">
-                  Resolved Candidate Previews ({generatedPreview.length})
-                </span>
-                <span className="text-[11px] text-zinc-400">Safe Sandbox Check</span>
-              </div>
-
-              <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-                {generatedPreview.map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="p-2 rounded-lg border border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30 flex items-center justify-between text-xs"
-                  >
-                    <div>
-                      <p className="font-medium text-zinc-900 dark:text-white">{item.name}</p>
-                      <p className="text-[11px] font-mono text-indigo-600 dark:text-indigo-400">
-                        {item.email}
-                      </p>
-                    </div>
-                    {item.valid ? (
-                      <span className="text-[10px] font-semibold text-emerald-600 flex items-center gap-1">
-                        <CheckCircle2 className="w-3.5 h-3.5" /> Valid Format
-                      </span>
-                    ) : (
-                      <span className="text-[10px] font-semibold text-rose-600 flex items-center gap-1">
-                        <AlertCircle className="w-3.5 h-3.5" /> Invalid Syntax
-                      </span>
-                    )}
-                  </div>
-                ))}
-
-                {generatedPreview.length === 0 && (
-                  <div className="py-8 text-center text-zinc-400">
-                    Click "Simulate & Test Pattern Match" to preview generated emails safely.
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* College Roster Directory Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
@@ -294,7 +232,7 @@ export const StudentOutreachView: React.FC<StudentOutreachViewProps> = ({
               className={`p-4 rounded-xl border transition-all cursor-pointer shadow-xs ${
                 isSelected
                   ? 'border-indigo-600 dark:border-indigo-400 bg-indigo-50/40 dark:bg-indigo-950/20'
-                  : 'border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-zinc-300'
+                  : 'border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-zinc-300 dark:hover:border-zinc-700'
               }`}
             >
               <div className="flex items-center justify-between mb-2">
@@ -307,7 +245,7 @@ export const StudentOutreachView: React.FC<StudentOutreachViewProps> = ({
                 {col.name}
               </h3>
               <p className="text-[11px] text-zinc-500 mt-1">
-                {isSelected ? 'Currently filtering list' : 'Click to filter student directory'}
+                {isSelected ? 'Active filter' : 'Click to filter campus'}
               </p>
             </div>
           );
@@ -377,7 +315,7 @@ export const StudentOutreachView: React.FC<StudentOutreachViewProps> = ({
               <tr>
                 <th className="px-4 py-3">Student Name</th>
                 <th className="px-4 py-3">Roll / ID</th>
-                <th className="px-4 py-3">Campus</th>
+                <th className="px-4 py-3">Campus & Course</th>
                 <th className="px-4 py-3">Department</th>
                 <th className="px-4 py-3">Batch</th>
                 <th className="px-4 py-3">Status</th>
@@ -400,8 +338,9 @@ export const StudentOutreachView: React.FC<StudentOutreachViewProps> = ({
                   <td className="px-4 py-3 font-mono font-medium text-zinc-800 dark:text-zinc-200">
                     {st.rollNumber || '—'}
                   </td>
-                  <td className="px-4 py-3 font-medium text-zinc-900 dark:text-white">
-                    {st.college || '—'}
+                  <td className="px-4 py-3">
+                    <p className="font-medium text-zinc-900 dark:text-white">{st.college || '—'}</p>
+                    {st.course && <p className="text-[11px] text-zinc-500">{st.course}</p>}
                   </td>
                   <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
                     {st.department || 'General'}
@@ -448,6 +387,153 @@ export const StudentOutreachView: React.FC<StudentOutreachViewProps> = ({
           </table>
         </div>
       </div>
+
+      {/* Add Single Student Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs" onClick={() => setShowAddModal(false)} />
+          <div className="relative w-full max-w-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl p-6 z-10 space-y-4">
+            <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
+              <h3 className="text-base font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+                <GraduationCap className="w-5 h-5 text-indigo-500" />
+                <span>Add New Student Contact</span>
+              </h3>
+              <button
+                onClick={() => setShowAddModal(false)}
+                className="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddStudentSubmit} className="space-y-3.5 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                    First Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newFirstName}
+                    onChange={(e) => setNewFirstName(e.target.value)}
+                    placeholder="e.g. Rahul"
+                    className="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                    Last Name
+                  </label>
+                  <input
+                    type="text"
+                    value={newLastName}
+                    onChange={(e) => setNewLastName(e.target.value)}
+                    placeholder="e.g. Sharma"
+                    className="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                  Student Email *
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  placeholder="rahul.s@stanfordtech.edu"
+                  className="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                    College / Campus
+                  </label>
+                  <input
+                    type="text"
+                    value={newCollege}
+                    onChange={(e) => setNewCollege(e.target.value)}
+                    placeholder="Stanford Tech Institute"
+                    className="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                    Department
+                  </label>
+                  <input
+                    type="text"
+                    value={newDept}
+                    onChange={(e) => setNewDept(e.target.value)}
+                    placeholder="Computer Science"
+                    className="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2.5">
+                <div>
+                  <label className="block font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                    Batch
+                  </label>
+                  <input
+                    type="text"
+                    value={newBatch}
+                    onChange={(e) => setNewBatch(e.target.value)}
+                    placeholder="2023-2027"
+                    className="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                    Roll / ID
+                  </label>
+                  <input
+                    type="text"
+                    value={newRollNumber}
+                    onChange={(e) => setNewRollNumber(e.target.value)}
+                    placeholder="CS23B104"
+                    className="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                    Course / Degree
+                  </label>
+                  <input
+                    type="text"
+                    value={newCourse}
+                    onChange={(e) => setNewCourse(e.target.value)}
+                    placeholder="B.Tech CSE"
+                    className="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-zinc-100 dark:border-zinc-800">
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(false)}
+                  className="px-4 py-2 rounded-xl text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 font-semibold hover:bg-zinc-800 dark:hover:bg-zinc-100 cursor-pointer"
+                >
+                  Add Student
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
