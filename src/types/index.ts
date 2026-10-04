@@ -1,15 +1,12 @@
 export type NavigationTab =
   | 'dashboard'
-  | 'campaigns'
   | 'students'
   | 'clients'
   | 'contacts'
-  | 'sequences'
+  | 'campaigns'
   | 'templates'
-  | 'analytics'
-  | 'inbox'
-  | 'suppression'
-  | 'settings';
+  | 'settings'
+  | 'create-campaign';
 
 export type ContactType = 'Student' | 'Client Lead' | 'Partner' | 'Faculty' | 'Organization' | 'Other';
 
