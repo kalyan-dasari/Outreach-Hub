@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   UploadCloud,
   X,
@@ -8,8 +8,8 @@ import {
   ArrowRight,
   ArrowLeft,
   ShieldAlert,
-  Users,
   Download,
+  ClipboardList,
 } from 'lucide-react';
 import { Contact, ContactType } from '../types';
 
@@ -20,11 +20,6 @@ interface CsvImportModalProps {
   existingEmails: Set<string>;
   suppressedEmails: Set<string>;
   defaultContactType?: ContactType;
-}
-
-interface ColumnMapping {
-  csvColumn: string;
-  targetField: string;
 }
 
 const TARGET_FIELDS = [
@@ -40,6 +35,8 @@ const TARGET_FIELDS = [
   { key: 'department', label: 'Department' },
   { key: 'batch', label: 'Batch / Cohort' },
   { key: 'rollNumber', label: 'Roll / Student ID' },
+  { key: 'course', label: 'Course / Degree' },
+  { key: 'section', label: 'Section' },
   { key: 'industry', label: 'Industry' },
   { key: 'personalObservation', label: 'Personal Observation' },
   { key: 'assignedOffer', label: 'Assigned Offer' },
@@ -53,8 +50,10 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
   suppressedEmails,
   defaultContactType = 'Student',
 }) => {
-  const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1);
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  const [inputMode, setInputMode] = useState<'upload' | 'paste'>('upload');
   const [file, setFile] = useState<File | null>(null);
+  const [pastedText, setPastedText] = useState('');
   const [rawHeaders, setRawHeaders] = useState<string[]>([]);
   const [rawRows, setRawRows] = useState<string[][]>([]);
   const [mappings, setMappings] = useState<Record<string, string>>({});
@@ -67,30 +66,51 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
   const [suppressedCount, setSuppressedCount] = useState(0);
   const [missingRequiredCount, setMissingRequiredCount] = useState(0);
 
+  useEffect(() => {
+    if (isOpen) {
+      setContactType(defaultContactType);
+      setStep(1);
+      setFile(null);
+      setPastedText('');
+      setRawHeaders([]);
+      setRawRows([]);
+      setMappings({});
+      setValidContacts([]);
+    }
+  }, [isOpen, defaultContactType]);
+
   if (!isOpen) return null;
 
   // Sample CSV generator for user convenience
   const handleDownloadSample = () => {
     const csvContent =
       contactType === 'Student'
-        ? `First Name,Last Name,Email,College,Department,Batch,Roll Number\nAarav,Patel,aarav.p@stanfordtech.edu,Stanford Tech Institute,Computer Science,2023-2027,CS23B102\nMeera,Rao,meera.r@mitengineering.edu,MIT College of Engineering,Information Technology,2022-2026,IT22A044\n`
+        ? `First Name,Last Name,Email,College,Department,Batch,Roll Number,Course\nAarav,Patel,aarav.p@stanfordtech.edu,Stanford Tech Institute,Computer Science,2023-2027,CS23B102,B.Tech CSE\nMeera,Rao,meera.r@mitengineering.edu,MIT College of Engineering,Information Technology,2022-2026,IT22A044,B.Tech IT\n`
         : `First Name,Last Name,Email,Company,Role,Website,City,Observation,Offer\nDavid,Miller,david@precisiondentaltx.com,Precision Dental,Managing Partner,precisiondentaltx.com,Austin,mobile site takes 6.2s to load,Free Mobile Booking Funnel\n`;
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `sample_${contactType.toLowerCase()}_outreach.csv`;
+    link.download = `sample_${contactType.toLowerCase().replace(/\s+/g, '_')}_outreach.csv`;
     link.click();
   };
 
-  const parseCsvText = (text: string) => {
+  const parseTextData = (text: string) => {
     const lines = text.split(/\r\n|\n/).filter((l) => l.trim().length > 0);
     if (lines.length < 1) return;
 
-    const headers = lines[0].split(',').map((h) => h.trim().replace(/^["']|["']$/g, ''));
+    // Detect separator (tab vs comma)
+    const firstLine = lines[0];
+    const isTab = firstLine.includes('\t');
+    const separator = isTab ? '\t' : ',';
+
+    const headers = firstLine.split(separator).map((h) => h.trim().replace(/^["']|["']$/g, ''));
     const rows = lines.slice(1).map((line) => {
-      // Basic CSV split respecting quotes
+      if (isTab) {
+        return line.split('\t').map((c) => c.trim().replace(/^["']|["']$/g, ''));
+      }
+      // Regex for CSV with quoted commas
       const regex = /(?:,|\n|^)("(?:(?:"")*[^"]*)*"|[^",\n]*|(?:\n|$))/g;
       const row: string[] = [];
       let match;
@@ -112,22 +132,26 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
     const autoMap: Record<string, string> = {};
     headers.forEach((h) => {
       const lower = h.toLowerCase().replace(/[^a-z]/g, '');
-      if (lower.includes('firstname') || lower === 'first' || lower === 'name') {
+      if (lower.includes('firstname') || lower === 'first' || lower === 'fname' || lower === 'name') {
         autoMap[h] = 'firstName';
-      } else if (lower.includes('lastname') || lower === 'last' || lower === 'surname') {
+      } else if (lower.includes('lastname') || lower === 'last' || lower === 'lname' || lower === 'surname') {
         autoMap[h] = 'lastName';
       } else if (lower.includes('email') || lower === 'mail') {
         autoMap[h] = 'email';
       } else if (lower.includes('company') || lower.includes('organization') || lower.includes('org')) {
         autoMap[h] = 'organization';
-      } else if (lower.includes('college') || lower.includes('university') || lower.includes('campus')) {
+      } else if (lower.includes('college') || lower.includes('university') || lower.includes('campus') || lower.includes('institute')) {
         autoMap[h] = 'college';
       } else if (lower.includes('dept') || lower.includes('department') || lower.includes('branch')) {
         autoMap[h] = 'department';
-      } else if (lower.includes('batch') || lower.includes('year') || lower.includes('cohort')) {
+      } else if (lower.includes('batch') || lower.includes('year') || lower.includes('cohort') || lower.includes('gradyear')) {
         autoMap[h] = 'batch';
-      } else if (lower.includes('roll') || lower.includes('student') || lower.includes('id')) {
+      } else if (lower.includes('roll') || lower.includes('studentid') || lower.includes('regno') || lower.includes('usn')) {
         autoMap[h] = 'rollNumber';
+      } else if (lower.includes('course') || lower.includes('degree') || lower.includes('program')) {
+        autoMap[h] = 'course';
+      } else if (lower.includes('section') || lower.includes('sec')) {
+        autoMap[h] = 'section';
       } else if (lower.includes('website') || lower.includes('url')) {
         autoMap[h] = 'website';
       } else if (lower.includes('role') || lower.includes('title') || lower.includes('position')) {
@@ -152,7 +176,7 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
     const reader = new FileReader();
     reader.onload = (event) => {
       const text = event.target?.result as string;
-      parseCsvText(text);
+      parseTextData(text);
     };
     reader.readAsText(f);
   };
@@ -165,13 +189,18 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
       const reader = new FileReader();
       reader.onload = (event) => {
         const text = event.target?.result as string;
-        parseCsvText(text);
+        parseTextData(text);
       };
       reader.readAsText(f);
     }
   };
 
-  // Step 4 Validation Engine
+  const handlePasteSubmit = () => {
+    if (!pastedText.trim()) return;
+    parseTextData(pastedText.trim());
+  };
+
+  // Validation Engine
   const runValidation = () => {
     let dupCount = 0;
     let invEmailCount = 0;
@@ -185,7 +214,7 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
         contactType,
         tags: [`Imported ${new Date().toLocaleDateString()}`],
         status: 'New',
-        source: `CSV (${file?.name || 'Manual Upload'})`,
+        source: inputMode === 'upload' ? `CSV (${file?.name || 'File Upload'})` : 'Pasted Roster Data',
         notes: [],
       };
 
@@ -205,20 +234,20 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
         return;
       }
 
-      // Check valid email format (RFC basic regex)
+      // Check valid email format
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(email)) {
         invEmailCount++;
         return;
       }
 
-      // Check duplicates in file or existing DB
+      // Check duplicates
       if (seenInFile.has(email) || existingEmails.has(email)) {
         dupCount++;
         return;
       }
 
-      // Check suppression / unsubscribe list
+      // Check suppression / unsubscribe
       if (suppressedEmails.has(email)) {
         supCount++;
         return;
@@ -233,12 +262,12 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
     setInvalidEmailsCount(invEmailCount);
     setSuppressedCount(supCount);
     setMissingRequiredCount(missReqCount);
-    setStep(4);
+    setStep(3);
   };
 
   const handleFinalImport = () => {
     onImportComplete(validContacts);
-    setStep(5);
+    setStep(4);
   };
 
   return (
@@ -248,16 +277,16 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
         {/* Modal Header */}
         <div className="px-6 py-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
           <div>
-            <h2 className="text-base font-semibold text-zinc-900 dark:text-white">
-              Import Contacts from CSV
+            <h2 className="text-base font-semibold text-zinc-900 dark:text-white flex items-center gap-2">
+              <FileSpreadsheet className="w-5 h-5 text-indigo-500" />
+              <span>Import {contactType === 'Student' ? 'Students Roster' : 'Client Leads'}</span>
             </h2>
             <p className="text-xs text-zinc-500">
-              Step {step} of 5 —{' '}
-              {step === 1 && 'Upload CSV File'}
-              {step === 2 && 'Preview Detected Columns'}
-              {step === 3 && 'Map CSV Columns to Fields'}
-              {step === 4 && 'Validation & Safeguards'}
-              {step === 5 && 'Import Summary'}
+              Step {step} of 4 —{' '}
+              {step === 1 && 'Provide File or Paste Table'}
+              {step === 2 && 'Map Columns & Preview'}
+              {step === 3 && 'Validation & Inspection'}
+              {step === 4 && 'Import Finished'}
             </p>
           </div>
           <button
@@ -270,16 +299,17 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
 
         {/* Modal Body */}
         <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
-          {/* STEP 1: Upload */}
+          {/* STEP 1: Upload or Paste */}
           {step === 1 && (
             <div className="space-y-4">
+              {/* Type Selector */}
               <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700/60">
                 <div>
                   <span className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">
-                    Import Type
+                    Contact Category
                   </span>
                   <p className="text-[11px] text-zinc-500">
-                    Select target audience profile for this list
+                    Choose whether you are importing students or business clients
                   </p>
                 </div>
                 <div className="flex gap-2">
@@ -294,44 +324,100 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
                           : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700'
                       }`}
                     >
-                      {type}
+                      {type === 'Student' ? 'Students' : 'Clients'}
                     </button>
                   ))}
                 </div>
               </div>
 
-              {/* Drag Drop Area */}
-              <div
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={handleDrop}
-                className="border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-2xl p-8 text-center hover:border-zinc-400 dark:hover:border-zinc-500 transition-colors flex flex-col items-center justify-center cursor-pointer bg-zinc-50/50 dark:bg-zinc-800/20"
-              >
-                <div className="w-12 h-12 rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 mb-3">
-                  <UploadCloud className="w-6 h-6 text-zinc-700 dark:text-zinc-300" />
-                </div>
-                <p className="text-sm font-semibold text-zinc-900 dark:text-white mb-1">
-                  Drag & drop your CSV file here, or browse
-                </p>
-                <p className="text-xs text-zinc-500 mb-4 max-w-sm">
-                  Accepts standard comma-separated .csv files. Encrypted client-side.
-                </p>
-                <label className="cursor-pointer px-4 py-2 text-xs font-medium rounded-lg bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors">
-                  <span>Browse Files</span>
-                  <input
-                    type="file"
-                    accept=".csv,text/csv"
-                    className="hidden"
-                    onChange={handleFileUpload}
-                  />
-                </label>
+              {/* Mode Toggle: File vs Paste */}
+              <div className="flex border-b border-zinc-200 dark:border-zinc-800 gap-4 text-xs font-medium">
+                <button
+                  type="button"
+                  onClick={() => setInputMode('upload')}
+                  className={`pb-2 flex items-center gap-1.5 border-b-2 transition-all ${
+                    inputMode === 'upload'
+                      ? 'border-zinc-900 dark:border-white text-zinc-900 dark:text-white font-semibold'
+                      : 'border-transparent text-zinc-400 hover:text-zinc-600'
+                  }`}
+                >
+                  <UploadCloud className="w-4 h-4" />
+                  <span>Upload File (.csv, .tsv)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInputMode('paste')}
+                  className={`pb-2 flex items-center gap-1.5 border-b-2 transition-all ${
+                    inputMode === 'paste'
+                      ? 'border-zinc-900 dark:border-white text-zinc-900 dark:text-white font-semibold'
+                      : 'border-transparent text-zinc-400 hover:text-zinc-600'
+                  }`}
+                >
+                  <ClipboardList className="w-4 h-4" />
+                  <span>Paste Columns (Excel / Sheets)</span>
+                </button>
               </div>
+
+              {inputMode === 'upload' ? (
+                /* Drag Drop Area */
+                <div
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={handleDrop}
+                  className="border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-2xl p-8 text-center hover:border-zinc-400 dark:hover:border-zinc-500 transition-colors flex flex-col items-center justify-center cursor-pointer bg-zinc-50/50 dark:bg-zinc-800/20"
+                >
+                  <div className="w-12 h-12 rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 mb-3">
+                    <UploadCloud className="w-6 h-6 text-zinc-700 dark:text-zinc-300" />
+                  </div>
+                  <p className="text-sm font-semibold text-zinc-900 dark:text-white mb-1">
+                    Drag & drop your CSV file here, or browse
+                  </p>
+                  <p className="text-xs text-zinc-500 mb-4 max-w-sm">
+                    Accepts comma-separated or tab-separated student / client files.
+                  </p>
+                  <label className="cursor-pointer px-4 py-2 text-xs font-medium rounded-lg bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors">
+                    <span>Browse Files</span>
+                    <input
+                      type="file"
+                      accept=".csv,.tsv,text/csv,text/tab-separated-values,text/plain"
+                      className="hidden"
+                      onChange={handleFileUpload}
+                    />
+                  </label>
+                </div>
+              ) : (
+                /* Paste Text Area */
+                <div className="space-y-3">
+                  <p className="text-xs text-zinc-500">
+                    Copy columns from your Excel spreadsheet or Google Sheet and paste them below:
+                  </p>
+                  <textarea
+                    rows={6}
+                    value={pastedText}
+                    onChange={(e) => setPastedText(e.target.value)}
+                    placeholder={
+                      contactType === 'Student'
+                        ? `First Name\tLast Name\tEmail\tCollege\tDepartment\tBatch\tRoll Number\nAarav\tPatel\taarav.p@stanfordtech.edu\tStanford Tech\tCSE\t2023-2027\tCS23B102`
+                        : `First Name\tLast Name\tEmail\tCompany\tRole\tCity\nDavid\tMiller\tdavid@company.com\tApex Media\tPartner\tAustin`
+                    }
+                    className="w-full p-3 font-mono text-xs rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-hidden focus:ring-2 focus:ring-zinc-900 dark:focus:ring-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={handlePasteSubmit}
+                    disabled={!pastedText.trim()}
+                    className="w-full py-2 bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 rounded-lg text-xs font-semibold hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-all disabled:opacity-40"
+                  >
+                    Parse Pasted Columns
+                  </button>
+                </div>
+              )}
 
               {/* Sample Download CTA */}
               <div className="flex items-center justify-between pt-2">
-                <span className="text-xs text-zinc-500">Need a template?</span>
+                <span className="text-xs text-zinc-500">Need a sample file to fill in?</span>
                 <button
                   onClick={handleDownloadSample}
-                  className="flex items-center gap-1.5 text-xs text-indigo-600 dark:text-indigo-400 hover:underline font-medium"
+                  className="flex items-center gap-1.5 text-xs text-indigo-600 dark:text-indigo-400 hover:underline font-medium cursor-pointer"
                 >
                   <Download className="w-3.5 h-3.5" />
                   <span>Download Sample {contactType} CSV</span>
@@ -340,59 +426,25 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
             </div>
           )}
 
-          {/* STEP 2: Preview Detected Columns */}
+          {/* STEP 2: Map Columns & Preview */}
           {step === 2 && (
             <div className="space-y-4">
               <div className="flex items-center justify-between text-xs">
                 <span className="text-zinc-500">
                   Detected <strong>{rawHeaders.length}</strong> columns and{' '}
-                  <strong>{rawRows.length}</strong> rows in <em>{file?.name}</em>
+                  <strong>{rawRows.length}</strong> rows
                 </span>
                 <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 font-medium">
-                  Valid CSV Header
+                  Auto-Mapped Fields
                 </span>
               </div>
 
-              {/* Preview Table */}
-              <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-x-auto custom-scrollbar max-h-60">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-semibold sticky top-0">
-                    <tr>
-                      {rawHeaders.map((h, i) => (
-                        <th key={i} className="px-3 py-2 border-b border-zinc-200 dark:border-zinc-700 whitespace-nowrap">
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800 text-zinc-600 dark:text-zinc-400">
-                    {rawRows.slice(0, 4).map((row, rIdx) => (
-                      <tr key={rIdx} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
-                        {row.map((cell, cIdx) => (
-                          <td key={cIdx} className="px-3 py-2 whitespace-nowrap max-w-xs truncate">
-                            {cell || '—'}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 3: Map Columns */}
-          {step === 3 && (
-            <div className="space-y-4">
-              <p className="text-xs text-zinc-500">
-                Map each column from your CSV file to Outreach Hub contact fields. Required fields are First Name and Email.
-              </p>
-
-              <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar pr-1">
+              {/* Column Mapping Grid */}
+              <div className="space-y-2 max-h-52 overflow-y-auto custom-scrollbar pr-1 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2.5">
                 {rawHeaders.map((header) => (
                   <div
                     key={header}
-                    className="flex items-center justify-between p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30 text-xs"
+                    className="flex items-center justify-between p-2 rounded-lg bg-zinc-50 dark:bg-zinc-800/40 text-xs"
                   >
                     <div className="flex items-center gap-2">
                       <FileSpreadsheet className="w-4 h-4 text-zinc-400" />
@@ -408,9 +460,9 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
                         onChange={(e) =>
                           setMappings({ ...mappings, [header]: e.target.value })
                         }
-                        className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 rounded-lg px-2.5 py-1 text-xs focus:ring-1 focus:ring-zinc-900 dark:focus:ring-white outline-none"
+                        className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 rounded-lg px-2 py-1 text-xs focus:ring-1 focus:ring-zinc-900 dark:focus:ring-white outline-none"
                       >
-                        <option value="">-- Ignore Column --</option>
+                        <option value="">-- Ignore --</option>
                         {TARGET_FIELDS.map((field) => (
                           <option key={field.key} value={field.key}>
                             {field.label}
@@ -421,15 +473,41 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
                   </div>
                 ))}
               </div>
+
+              {/* Quick Preview Table */}
+              <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-x-auto custom-scrollbar max-h-40">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-semibold sticky top-0">
+                    <tr>
+                      {rawHeaders.map((h, i) => (
+                        <th key={i} className="px-3 py-1.5 border-b border-zinc-200 dark:border-zinc-700 whitespace-nowrap">
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800 text-zinc-600 dark:text-zinc-400">
+                    {rawRows.slice(0, 3).map((row, rIdx) => (
+                      <tr key={rIdx}>
+                        {row.map((cell, cIdx) => (
+                          <td key={cIdx} className="px-3 py-1.5 whitespace-nowrap max-w-xs truncate">
+                            {cell || '—'}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
 
-          {/* STEP 4: Validation Engine Report */}
-          {step === 4 && (
+          {/* STEP 3: Validation Report */}
+          {step === 3 && (
             <div className="space-y-4">
               <div className="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700">
                 <h3 className="text-xs font-semibold text-zinc-900 dark:text-white uppercase tracking-wider mb-3">
-                  Data Quality & Safeguards Inspection
+                  Verification Summary
                 </h3>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
                   <div className="p-3 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800">
@@ -442,45 +520,39 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
                     <p className="text-xl font-bold text-amber-600 dark:text-amber-400">
                       {duplicatesCount}
                     </p>
-                    <p className="text-[11px] text-zinc-500 font-medium">Duplicates Filtered</p>
+                    <p className="text-[11px] text-zinc-500 font-medium">Duplicate Emails</p>
                   </div>
                   <div className="p-3 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800">
                     <p className="text-xl font-bold text-rose-600 dark:text-rose-400">
                       {invalidEmailsCount + missingRequiredCount}
                     </p>
-                    <p className="text-[11px] text-zinc-500 font-medium">Invalid Emails / Format</p>
+                    <p className="text-[11px] text-zinc-500 font-medium">Invalid / Missing</p>
                   </div>
                   <div className="p-3 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800">
                     <p className="text-xl font-bold text-indigo-600 dark:text-indigo-400">
                       {suppressedCount}
                     </p>
-                    <p className="text-[11px] text-zinc-500 font-medium">Suppressed Contacts</p>
+                    <p className="text-[11px] text-zinc-500 font-medium">Suppressed</p>
                   </div>
                 </div>
               </div>
 
-              {suppressedCount > 0 && (
-                <div className="p-3 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 text-xs text-indigo-800 dark:text-indigo-300 flex items-center gap-2">
-                  <ShieldAlert className="w-4 h-4 shrink-0" />
-                  <span>
-                    {suppressedCount} contacts were automatically removed because they exist in your global suppression/unsubscribe list.
-                  </span>
-                </div>
-              )}
-
-              {duplicatesCount > 0 && (
-                <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-300 flex items-center gap-2">
+              {validContacts.length === 0 ? (
+                <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-xs text-rose-800 dark:text-rose-300 flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4 shrink-0" />
-                  <span>
-                    {duplicatesCount} duplicate email addresses were excluded to prevent double-contacting recipients.
-                  </span>
+                  <span>No valid rows found. Please check that First Name and Email columns are properly mapped.</span>
+                </div>
+              ) : (
+                <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <span>{validContacts.length} valid {contactType.toLowerCase()} contacts are ready to be added to your directory.</span>
                 </div>
               )}
             </div>
           )}
 
-          {/* STEP 5: Final Summary */}
-          {step === 5 && (
+          {/* STEP 4: Final Success */}
+          {step === 4 && (
             <div className="text-center py-6 space-y-4">
               <div className="w-14 h-14 bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 rounded-2xl flex items-center justify-center mx-auto">
                 <CheckCircle2 className="w-8 h-8" />
@@ -490,35 +562,8 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
                   Import Complete!
                 </h3>
                 <p className="text-xs text-zinc-500 mt-1">
-                  Successfully imported {validContacts.length} verified {contactType} contacts into your workspace.
+                  Successfully imported {validContacts.length} {contactType} contacts into your database.
                 </p>
-              </div>
-
-              <div className="max-w-md mx-auto p-4 rounded-xl bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800 text-xs space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-zinc-500">Imported into directory:</span>
-                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                    {validContacts.length}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-zinc-500">Excluded duplicates:</span>
-                  <span className="font-semibold text-zinc-700 dark:text-zinc-300">
-                    {duplicatesCount}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-zinc-500">Excluded invalid format:</span>
-                  <span className="font-semibold text-zinc-700 dark:text-zinc-300">
-                    {invalidEmailsCount + missingRequiredCount}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-zinc-500">Excluded by suppression:</span>
-                  <span className="font-semibold text-indigo-600 dark:text-indigo-400">
-                    {suppressedCount}
-                  </span>
-                </div>
               </div>
             </div>
           )}
@@ -526,7 +571,7 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
 
         {/* Modal Footer Controls */}
         <div className="px-6 py-3.5 bg-zinc-50 dark:bg-zinc-800/50 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between text-xs">
-          {step > 1 && step < 5 ? (
+          {step > 1 && step < 4 ? (
             <button
               onClick={() => setStep((s) => (s - 1) as any)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 font-medium"
@@ -539,7 +584,7 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
           )}
 
           <div className="flex gap-2">
-            {step < 5 && (
+            {step < 4 && (
               <button
                 onClick={onClose}
                 className="px-3 py-1.5 rounded-lg text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200/50 dark:hover:bg-zinc-800 font-medium"
@@ -550,39 +595,29 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
 
             {step === 2 && (
               <button
-                onClick={() => setStep(3)}
-                className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 font-semibold hover:bg-zinc-800 dark:hover:bg-zinc-100"
+                onClick={runValidation}
+                className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 font-semibold hover:bg-zinc-800 dark:hover:bg-zinc-100 cursor-pointer"
               >
-                <span>Continue to Mapping</span>
+                <span>Validate & Inspect</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             )}
 
             {step === 3 && (
               <button
-                onClick={runValidation}
-                className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 font-semibold hover:bg-zinc-800 dark:hover:bg-zinc-100"
-              >
-                <span>Validate CSV</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            )}
-
-            {step === 4 && (
-              <button
                 onClick={handleFinalImport}
                 disabled={validContacts.length === 0}
-                className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-500 disabled:opacity-50"
+                className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-500 disabled:opacity-50 cursor-pointer"
               >
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 <span>Confirm & Import ({validContacts.length})</span>
               </button>
             )}
 
-            {step === 5 && (
+            {step === 4 && (
               <button
                 onClick={onClose}
-                className="px-4 py-1.5 rounded-lg bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 font-semibold hover:bg-zinc-800 dark:hover:bg-zinc-100"
+                className="px-4 py-1.5 rounded-lg bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 font-semibold hover:bg-zinc-800 dark:hover:bg-zinc-100 cursor-pointer"
               >
                 Done
               </button>
